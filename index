@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бланк заказа | Пилим и Кромим</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --header-bg: #1f2937;
+            --accent: #dc2626;
+            --bg: #f3f4f6;
+        }
+
+        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: #111827; }
+
+        /* Таблица (Excel-like) */
+        .excel-table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; }
+        .excel-table th {
+            background: #e5e7eb; color: #374151; font-weight: 600;
+            border: 1px solid #9ca3af; padding: 8px 4px; text-align: center; font-size: 11px; white-space: nowrap;
+        }
+        .excel-table td { border: 1px solid #d1d5db; padding: 0; }
+        
+        .cell-input {
+            width: 100%; height: 100%; padding: 8px 4px; border: none; outline: none;
+            text-align: center; background: transparent; font-size: 13px; font-weight: 500;
+        }
+        .cell-input:focus { background: #eff6ff; box-shadow: inset 0 0 0 2px #3b82f6; }
+
+        /* Кнопки кромки */
+        .edge-toggle {
+            cursor: pointer; user-select: none; height: 34px; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 11px; transition: 0.1s;
+        }
+        .e-none { background: transparent; color: #e5e7eb; } .e-none::after { content: "—"; }
+        .e-04 { background: #bfdbfe; color: #1e40af; } .e-04::after { content: "0.4"; }
+        .e-2 { background: #fca5a5; color: #991b1b; } .e-2::after { content: "2.0"; }
+
+        /* Блок итогов */
+        .summary-panel {
+            background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+            padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            position: sticky; top: 20px;
+        }
+
+        /* Поля ввода доп. услуг */
+        .srv-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .srv-input { width: 60px; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px; text-align: center; }
+
+        /* Стили для печати/PDF */
+        #pdf-hidden-template { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #pdf-hidden-template, #pdf-hidden-template * { visibility: visible; display: block; }
+            #pdf-hidden-template { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header class="bg-[#1f2937] text-white py-4 shadow-lg sticky top-0 z-50">
+        <div class="max-w-[1600px] mx-auto px-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="font-black text-2xl tracking-wider leading-none">
+                    ПИЛИМ<span class="text-red-600">И</span>КРОМИМ
+                </div>
+                <div class="hidden md:block text-[10px] text-gray-400 uppercase tracking-widest border-l border-gray-600 pl-3">
+                    Услуги распила и кромления
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="font-bold text-lg text-white">+7 (900) 255-71-77</div>
+                <div class="text-xs text-gray-400">Краснодар, ул. Тихорецкая 22</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-[1600px] mx-auto w-full p-4 grid grid-cols-1 xl:grid-cols-4 gap-6">
+        
+        <div class="xl:col-span-3 space-y-4">
+            
+            <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="font-bold text-gray-700 uppercase text-xs mb-4 border-b pb-2 flex items-center gap-2">
+                    <i data-lucide="user" class="w-4 h-4"></i> Данные заказчика
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <label class="block text-gray-500 text-xs mb-1">ФИО / Организация *</label>
+                        <input type="text" id="client_name" class="w-full border rounded p-2 bg-gray-50 focus:bg-white focus:border-blue-500 outline-none transition" placeholder="Иванов И.И.">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 text-xs mb-1">Телефон *</label>
+                        <input type="text" id="client_phone" class="w-full border rounded p-2 bg-gray-50 focus:bg-white focus:border-blue-500 outline-none transition" placeholder="+7 (___) ___-__-__">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 text-xs mb-1">Email (для ответа)</label>
+                        <input type="email" id="client_email" class="w-full border rounded p-2 bg-gray-50 focus:bg-white focus:border-blue-500 outline-none transition" placeholder="example@mail.ru">
+                    </div>
+                    <div>
+                        <label class="block text-gray-500 text-xs mb-1">Адрес доставки</label>
+                        <input type="text" id="client_address" class="w-full border rounded p-2 bg-gray-50 focus:bg-white focus:border-blue-500 outline-none transition" placeholder="г. Краснодар...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="md:col-span-1">
+                    <label class="block text-gray-500 text-xs mb-1 font-bold uppercase">Материал (Влияет на цену)</label>
+                    <select id="materialSelect" onchange="updatePrices()" class="w-full border-2 border-blue-100 rounded p-2 bg-white font-medium text-gray-900 focus:border-blue-500 outline-none cursor-pointer">
+                        <option value="18">ЛДСП 8-16 мм (18 ₽/м)</option>
+                        <option value="28">ЛДСП 18-22 мм (28 ₽/м)</option>
+                        <option value="33">ЛДСП 25-32 мм (33 ₽/м)</option>
+                        <option value="16">ДВП / ХДФ (16 ₽/м)</option>
+                        <option value="26">МДФ / AGT (26 ₽/м)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 flex items-end justify-between gap-4">
+                    <div class="flex-grow">
+                         <label class="block text-gray-500 text-xs mb-1">Декор / Цвет</label>
+                         <input type="text" id="material_decor" class="w-full border rounded p-2 bg-gray-50" placeholder="Например: Белый Снег">
+                    </div>
+                    <button onclick="clearAll()" class="text-red-600 border border-red-200 hover:bg-red-50 font-medium py-2 px-4 rounded transition text-xs uppercase h-[38px]">
+                        Очистить
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="excel-table" id="calcTable">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" class="w-8">№</th>
+                                <th rowspan="2" class="w-20">Длина<br>(мм)</th>
+                                <th rowspan="2" class="w-20">Ширина<br>(мм)</th>
+                                <th rowspan="2" class="w-16">Кол-во<br>(шт)</th>
+                                <th rowspan="2" class="w-16">Вращ.<br>(Текст.)</th>
+                                <th colspan="2">Кромка Длина (L)</th>
+                                <th colspan="2">Кромка Ширина (W)</th>
+                                <th rowspan="2" class="w-40">Примечание</th>
+                                <th rowspan="2" class="w-8"></th>
+                            </tr>
+                            <tr>
+                                <th class="w-12">L1</th>
+                                <th class="w-12">L2</th>
+                                <th class="w-12">W1</th>
+                                <th class="w-12">W2</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="p-3 bg-gray-50 border-t border-gray-200">
+                    <button onclick="addRow()" class="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-300 py-2 px-4 rounded shadow-sm hover:bg-gray-50">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Добавить строку
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-6 text-xs text-gray-500 justify-start pl-2">
+                <div class="flex items-center gap-2"><div class="w-4 h-4 border bg-transparent flex items-center justify-center text-[8px] text-gray-300">—</div> Без кромки</div>
+                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-blue-200 text-blue-800 flex items-center justify-center text-[8px] font-bold">0.4</div> 0.4х19 мм (21 ₽)</div>
+                <div class="flex items-center gap-2"><div class="w-4 h-4 bg-red-200 text-red-900 flex items-center justify-center text-[8px] font-bold">2.0</div> 2.0х19 мм (23 ₽)</div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <div class="bg-white border rounded-md p-3 text-sm">
+                    <div class="font-bold text-xs uppercase text-gray-500 mb-2 border-b pb-1">Присадка и Фрезеровка</div>
+                    <div class="srv-row">
+                        <span>Отверстия 5-10 мм (8₽):</span>
+                        <input type="number" id="drill_small" class="srv-input" oninput="calc()" placeholder="0">
+                    </div>
+                    <div class="srv-row">
+                        <span>Отверстия под петли (30₽):</span>
+                        <input type="number" id="drill_hinge" class="srv-input" oninput="calc()" placeholder="0">
+                    </div>
+                    <div class="srv-row">
+                        <span>Паз под ДВП (40₽/м):</span>
+                        <input type="number" id="mill_groove" class="srv-input" oninput="calc()" placeholder="м">
+                    </div>
+                    <div class="srv-row">
+                        <span>Радиус (140₽/шт):</span>
+                        <input type="number" id="mill_radius" class="srv-input" oninput="calc()" placeholder="шт">
+                    </div>
+                </div>
+
+                <div class="bg-white border rounded-md p-3 text-sm">
+                    <div class="font-bold text-xs uppercase text-gray-500 mb-2 border-b pb-1">Обработка</div>
+                    <div class="srv-row">
+                        <span>Распил под углом (70₽):</span>
+                        <input type="number" id="cut_angle" class="srv-input" oninput="calc()" placeholder="шт">
+                    </div>
+                    <div class="srv-row">
+                        <span>Склейка деталей (150₽):</span>
+                        <input type="number" id="glue_detail" class="srv-input" oninput="calc()" placeholder="шт">
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer mt-3 text-sm">
+                        <input type="checkbox" id="srv_fug" onchange="calc()" class="w-4 h-4 text-blue-600 rounded">
+                        <span>Прифуговка (10 ₽/м)</span>
+                    </label>
+                </div>
+
+                <div class="bg-white border rounded-md p-3 text-sm">
+                    <div class="font-bold text-xs uppercase text-gray-500 mb-2 border-b pb-1">Логистика</div>
+                    <div class="srv-row text-xs text-gray-400 mb-2">Кол-во плит (S/5м²):</div>
+                    <div class="srv-row">
+                        <span>Кол-во плит:</span>
+                        <input type="number" id="sheets_qty" class="srv-input bg-gray-50" readonly>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer mt-2 text-sm">
+                        <input type="checkbox" id="srv_pack" onchange="calc()" class="w-4 h-4 text-blue-600 rounded">
+                        <span>Упаковка (150 ₽/плита)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer mt-1 text-sm">
+                        <input type="checkbox" id="srv_load" onchange="calc()" class="w-4 h-4 text-blue-600 rounded">
+                        <span>Погрузка (100 ₽/плита)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="xl:col-span-1">
+            <div class="summary-panel" id="invoice">
+                <h2 class="font-bold text-lg mb-4 flex items-center gap-2 border-b pb-2">
+                    <i data-lucide="calculator" class="w-5 h-5 text-red-500"></i> Смета
+                </h2>
+                
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between items-center text-gray-600">
+                        <span>Распил (<span id="cutLen">0</span> м):</span>
+                        <span class="font-bold text-gray-900"><span id="cutSum">0</span> ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center text-blue-800">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Кромка 0.4:</span>
+                        <span class="font-bold"><span id="sum04">0</span> ₽</span>
+                    </div>
+                    <div class="flex justify-between items-center text-red-900">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Кромка 2.0:</span>
+                        <span class="font-bold"><span id="sum2">0</span> ₽</span>
+                    </div>
+                    <div class="flex justify-between text-gray-600 pt-2 border-t border-dashed mt-2">
+                        <span>Доп. услуги:</span>
+                        <span class="font-medium"><span id="sumService">0</span> ₽</span>
+                    </div>
+
+                    <div class="border-t-2 border-gray-800 pt-4 mt-4">
+                        <div class="flex justify-between items-end">
+                            <span class="text-gray-500 font-bold uppercase text-xs">Итого к оплате:</span>
+                            <span class="text-3xl font-black text-[#1f2937]" id="grandTotal">0 ₽</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 space-y-3">
+                    <button onclick="downloadPDF()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded font-bold transition flex items-center justify-center gap-2 border border-gray-300">
+                        <i data-lucide="file-down" class="w-4 h-4"></i> Скачать PDF
+                    </button>
+                    
+                    <button onclick="sendEmail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded font-bold transition flex items-center justify-center gap-2 shadow-md">
+                        <i data-lucide="mail" class="w-4 h-4"></i> Отправить на Email
+                    </button>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="sendWhatsapp()" title="WhatsApp" class="bg-green-500 hover:bg-green-600 text-white py-3 rounded font-bold transition flex items-center justify-center gap-2">
+                            <i data-lucide="message-circle" class="w-5 h-5"></i>
+                        </button>
+                        <button onclick="sendTelegram()" title="Telegram" class="bg-sky-500 hover:bg-sky-600 text-white py-3 rounded font-bold transition flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-5 h-5"></i>
+                        </button>
+                         <button onclick="sendMAX()" title="MAX.ru" class="bg-purple-600 hover:bg-purple-700 text-white py-3 rounded font-bold transition flex items-center justify-center gap-2 text-xs">
+                            MAX
+                        </button>
+                    </div>
+
+                    <div class="text-[10px] text-center text-gray-400 leading-tight mt-2">
+                        *Расчет предварительный.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="pdf-hidden-template" class="p-8 bg-white text-black">
+        <div class="flex justify-between items-center mb-6 border-b-2 border-gray-800 pb-4">
+            <div>
+                <h1 class="text-3xl font-black uppercase">ПИЛИМ<span class="text-red-600">И</span>КРОМИМ</h1>
+                <p class="text-sm text-gray-500 mt-1">Центр распила и кромления</p>
+            </div>
+            <div class="text-right">
+                <div class="font-bold text-lg">+7 (900) 255-71-77</div>
+                <div class="text-sm">mail@pilimikromim.ru</div>
+            </div>
+        </div>
+
+        <div class="mb-6 grid grid-cols-2 gap-8 text-sm">
+            <div>
+                <div class="font-bold uppercase text-gray-500 text-xs mb-1">Заказчик:</div>
+                <div id="pdf_client_name" class="font-bold text-lg border-b border-gray-300 pb-1 mb-2"></div>
+                <div>Тел: <span id="pdf_client_phone"></span></div>
+                <div>Email: <span id="pdf_client_email"></span></div>
+                <div>Адрес: <span id="pdf_client_address"></span></div>
+            </div>
+            <div>
+                <div class="font-bold uppercase text-gray-500 text-xs mb-1">Материал:</div>
+                <div id="pdf_mat_info" class="font-bold text-lg border-b border-gray-300 pb-1 mb-2"></div>
+                <div>Декор: <span id="pdf_mat_decor"></span></div>
+                <div>Дата: <span id="pdf_date"></span></div>
+            </div>
+        </div>
+
+        <div id="pdf-table-container" class="mb-6"></div>
+
+        <div class="flex justify-end">
+            <div class="w-1/2">
+                <div id="pdf_services_list" class="text-xs text-gray-500 mb-4 text-right"></div>
+                <div class="flex justify-between items-end border-t-2 border-gray-800 pt-2">
+                    <span class="font-bold text-lg">ИТОГО:</span>
+                    <span id="pdf_total" class="font-black text-3xl"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === ПРАЙС ===
+        let PRICES = {
+            cut: 18, edge04: 21, edge2: 23,
+            drill_small: 8, drill_hinge: 30,
+            mill_groove: 40, mill_radius: 140,
+            cut_angle: 70, fug: 10, glue: 150, pack: 150, load: 100
+        };
+
+        let rows = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            for(let i=0; i<8; i++) addRow(false);
+            render();
+            updatePrices(); 
+        });
+
+        function updatePrices() {
+            PRICES.cut = parseInt(document.getElementById('materialSelect').value);
+            calc();
+        }
+
+        function addRow(doRender = true) {
+            const id = Math.random().toString(36).substr(2, 9);
+            rows.push({ id, l: '', w: '', q: 1, rot: false, eL1: 0, eL2: 0, eW1: 0, eW2: 0, note: '' });
+            if(doRender) render();
+        }
+
+        function render() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            rows.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center text-gray-400 text-xs">${idx + 1}</td>
+                    <td><input type="number" class="cell-input" placeholder="0" value="${r.l}" oninput="upd('${r.id}', 'l', this.value)"></td>
+                    <td><input type="number" class="cell-input" placeholder="0" value="${r.w}" oninput="upd('${r.id}', 'w', this.value)"></td>
+                    <td><input type="number" class="cell-input bg-gray-50 font-bold" value="${r.q}" oninput="upd('${r.id}', 'q', this.value)"></td>
+                    <td class="text-center"><input type="checkbox" class="w-4 h-4 accent-gray-600" ${r.rot ? 'checked' : ''} onchange="upd('${r.id}', 'rot', this.checked)"></td>
+                    <td><div class="edge-toggle ${getEC(r.eL1)}" onclick="tog('${r.id}', 'eL1')"></div></td>
+                    <td><div class="edge-toggle ${getEC(r.eL2)}" onclick="tog('${r.id}', 'eL2')"></div></td>
+                    <td><div class="edge-toggle ${getEC(r.eW1)}" onclick="tog('${r.id}', 'eW1')"></div></td>
+                    <td><div class="edge-toggle ${getEC(r.eW2)}" onclick="tog('${r.id}', 'eW2')"></div></td>
+                    <td><input type="text" class="cell-input text-left px-2 text-gray-500 font-normal" placeholder="..." value="${r.note}" oninput="upd('${r.id}', 'note', this.value)"></td>
+                    <td class="text-center"><button onclick="del('${r.id}')" class="text-gray-300 hover:text-red-500"><i data-lucide="x" class="w-4 h-4"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+            calc();
+        }
+
+        function upd(id, key, val) {
+            const row = rows.find(x => x.id === id);
+            if(['l','w','q'].includes(key)) val = parseFloat(val);
+            row[key] = val;
+            calc();
+        }
+        function tog(id, key) {
+            const row = rows.find(x => x.id === id);
+            row[key] = (row[key] + 1) % 3;
+            render();
+        }
+        function getEC(val) { return val === 1 ? 'e-04' : (val === 2 ? 'e-2' : 'e-none'); }
+        function del(id) { rows = rows.filter(x => x.id !== id); render(); }
+        function clearAll() { if(confirm('Очистить таблицу?')) { rows = []; for(let i=0; i<8; i++) addRow(false); render(); } }
+
+        function calc() {
+            let cutLen = 0, len04 = 0, len2 = 0, area = 0, fugLen = 0;
+            rows.forEach(r => {
+                const l = (parseFloat(r.l)||0)/1000, w = (parseFloat(r.w)||0)/1000, q = parseFloat(r.q)||0;
+                if(l>0 && w>0 && q>0) {
+                    area += l*w*q;
+                    cutLen += (l+w)*2*q;
+                    [r.eL1, r.eL2, r.eW1, r.eW2].forEach(e => {
+                        if(e===1) len04 += ((e===r.eL1||e===r.eL2)?l:w)*q;
+                        if(e===2) len2 += ((e===r.eL1||e===r.eL2)?l:w)*q;
+                        if(e>0) fugLen += ((e===r.eL1||e===r.eL2)?l:w)*q;
+                    });
+                }
+            });
+
+            // Допы
+            const qtySmall = parseFloat(document.getElementById('drill_small').value)||0;
+            const qtyHinge = parseFloat(document.getElementById('drill_hinge').value)||0;
+            const grooveM = parseFloat(document.getElementById('mill_groove').value)||0;
+            const radiusQ = parseFloat(document.getElementById('mill_radius').value)||0;
+            const angleQ = parseFloat(document.getElementById('cut_angle').value)||0;
+            const glueQ = parseFloat(document.getElementById('glue_detail').value)||0;
+
+            let drillSum = (qtySmall*PRICES.drill_small)+(qtyHinge*PRICES.drill_hinge)+(grooveM*PRICES.mill_groove)+(radiusQ*PRICES.mill_radius);
+            let srvSum = (angleQ*PRICES.cut_angle)+(glueQ*PRICES.glue);
+            if(document.getElementById('srv_fug').checked) srvSum += (fugLen*PRICES.fug);
+
+            const sheets = Math.ceil(area/5)||1;
+            document.getElementById('sheets_qty').value = sheets;
+            if(document.getElementById('srv_pack').checked) srvSum += (sheets*PRICES.pack);
+            if(document.getElementById('srv_load').checked) srvSum += (sheets*PRICES.load);
+
+            // UI
+            document.getElementById('cutLen').innerText = cutLen.toFixed(1);
+            document.getElementById('cutSum').innerText = Math.round(cutLen*PRICES.cut);
+            document.getElementById('sum04').innerText = Math.round(len04*PRICES.edge04);
+            document.getElementById('sum2').innerText = Math.round(len2*PRICES.edge2);
+            document.getElementById('sumService').innerText = Math.round(srvSum + drillSum);
+            document.getElementById('grandTotal').innerText = Math.round((cutLen*PRICES.cut)+(len04*PRICES.edge04)+(len2*PRICES.edge2)+drillSum+srvSum).toLocaleString() + ' ₽';
+        }
+
+        // --- ДЕЙСТВИЯ ---
+        
+        function getOrderText() {
+            const client = document.getElementById('client_name').value || "Не указан";
+            const phone = document.getElementById('client_phone').value || "Не указан";
+            const addr = document.getElementById('client_address').value || "-";
+            const mat = document.getElementById('materialSelect').options[document.getElementById('materialSelect').selectedIndex].text;
+            const decor = document.getElementById('material_decor').value || "Не указан";
+            const total = document.getElementById('grandTotal').innerText;
+            
+            let txt = `ЗАКАЗ НА РАСПИЛ\n`;
+            txt += `Заказчик: ${client}\nТел: ${phone}\nАдрес: ${addr}\nМатериал: ${mat}\nДекор: ${decor}\n\n`;
+            
+            rows.forEach((r, i) => {
+                if(r.l && r.w) {
+                    txt += `${i+1}. ${r.l}x${r.w} - ${r.q}шт`;
+                    if(r.eL1||r.eL2||r.eW1||r.eW2) txt += ` (Кр: L=${r.eL1}/${r.eL2}, W=${r.eW1}/${r.eW2})`;
+                    if(r.note) txt += ` [${r.note}]`;
+                    txt += `\n`;
+                }
+            });
+            
+            txt += `\nИТОГО: ${total}`;
+            return txt;
+        }
+
+        function downloadPDF() {
+            // Заполнение шаблона
+            document.getElementById('pdf_client_name').innerText = document.getElementById('client_name').value;
+            document.getElementById('pdf_client_phone').innerText = document.getElementById('client_phone').value;
+            document.getElementById('pdf_client_email').innerText = document.getElementById('client_email').value;
+            document.getElementById('pdf_client_address').innerText = document.getElementById('client_address').value;
+            document.getElementById('pdf_mat_info').innerText = document.getElementById('materialSelect').options[document.getElementById('materialSelect').selectedIndex].text;
+            document.getElementById('pdf_mat_decor').innerText = document.getElementById('material_decor').value;
+            document.getElementById('pdf_date').innerText = new Date().toLocaleDateString();
+            document.getElementById('pdf_total').innerText = document.getElementById('grandTotal').innerText;
+            
+            // Клонируем таблицу
+            const tableClone = document.getElementById('calcTable').cloneNode(true);
+            tableClone.querySelectorAll('button').forEach(b => b.remove());
+            tableClone.querySelectorAll('input').forEach(inp => {
+                const span = document.createElement('span');
+                if(inp.type === 'checkbox') span.innerText = inp.checked ? 'V' : '';
+                else span.innerText = inp.value;
+                inp.replaceWith(span);
+            });
+            tableClone.querySelectorAll('.edge-toggle').forEach(div => {
+                const txt = div.classList.contains('e-04') ? '0.4' : (div.classList.contains('e-2') ? '2.0' : '-');
+                div.replaceWith(txt);
+            });
+
+            document.getElementById('pdf-table-container').innerHTML = '';
+            document.getElementById('pdf-table-container').appendChild(tableClone);
+
+            const el = document.getElementById('pdf-hidden-template');
+            const opt = { margin: 10, filename: 'Blan_Zakaza_PilimIKromim.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+            html2pdf().set(opt).from(el).save();
+        }
+
+        function sendEmail() {
+            const email = "mail@pilimikromim.ru";
+            const subject = "Заказ на распил: " + (document.getElementById('client_name').value || "Клиент");
+            const body = getOrderText();
+            window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        function sendWhatsapp() {
+            const phone = "79002557177";
+            const text = getOrderText();
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function sendTelegram() {
+             const text = getOrderText();
+             window.open(`https://t.me/share/url?url=${encodeURIComponent("Заказ")}&text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function sendMAX() {
+             // Открытие сайта max.ru в новой вкладке
+             window.open('https://max.ru/', '_blank');
+        }
+    </script>
+</body>
+</html>
